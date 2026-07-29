@@ -5,15 +5,14 @@
 
 [中文](#中文) · [English](#english)
 
-Fate Fork 是一个面向年轻决策焦虑群体的 **ToC 受控多模态叙事 AIGC
-抉择自省工具**。它借用紫微斗数的长期视角与塔罗的短期镜像，也提供不启用任何
-命理符号的开放式对话。产品不预测命运、不替用户做决定；符号只负责打开视角，
-现实选择始终属于用户。
+Fate Fork 面向正在经历决策焦虑的年轻人，以受控多模态叙事陪伴你梳理选择与感受。
+它借用紫微斗数的长期视角与塔罗的短期镜像，也提供不启用任何命理符号的开放式对话。
+产品不预测命运，也不替用户做决定；符号只负责打开视角，现实选择始终属于用户。
 
-Fate Fork is a consumer-facing, controlled multimodal narrative experience for
-reflective decision-making. It offers a long-horizon Zi Wei lens, a short-horizon
-tarot mirror, and an open conversation path with no divination symbols. It does
-not predict fate or decide for the user.
+Fate Fork is a controlled multimodal narrative tool for young people navigating
+decision anxiety. It offers a long-horizon Zi Wei lens, a short-horizon tarot
+mirror, and an open conversation path with no divination symbols. It does not
+predict fate or make decisions for the user; symbols simply open a perspective.
 
 ---
 
@@ -433,3 +432,8 @@ and claims using “注定”, “成败”, “大凶”, or “大吉”. Narr
 language, preserve multiple possibilities, and remain reflective rather than
 medical, mental-health, legal, financial, employment, or safety advice. The
 user remains the author of every choice.
+
+### Copyright
+
+Copyright © 2026 Rain Liu. All rights reserved. This project is proprietary;
+see [LICENSE](LICENSE) for usage restrictions.
