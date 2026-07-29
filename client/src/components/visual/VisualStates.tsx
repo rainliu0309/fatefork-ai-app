@@ -24,7 +24,7 @@ export interface VisualEmptyStateProps {
 
 export function VisualLoadingState({
   title = "正在展开叙事",
-  description = "规则引擎与叙事模型正在安静地整理线索，请稍候。",
+  description = "正在安静地整理线索，请稍候。",
   steps,
   activeStep = 0,
   compact = false,

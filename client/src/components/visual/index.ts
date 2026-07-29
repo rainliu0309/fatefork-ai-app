@@ -3,6 +3,8 @@ export {
   type ParticleBackgroundProps,
 } from "./ParticleBackground";
 
+export { PointerAura } from "./PointerAura";
+
 export {
   DualTrackTimeline,
   GenerativeTimeline,
@@ -12,6 +14,11 @@ export {
   type TimelineTempo,
   type TimelineTrack,
 } from "./GenerativeTimeline";
+
+export {
+  TarotSelfDraw,
+  type TarotSelfDrawProps,
+} from "./TarotSelfDraw";
 
 export {
   TarotFlipSpread,

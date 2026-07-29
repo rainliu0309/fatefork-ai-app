@@ -11,21 +11,29 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/lib/locale";
 import { cn } from "@/lib/utils";
-import { ParticleBackground } from "@/components/visual";
-
-const navItems = [
-  { to: "/ziwei", label: "星轨推演", icon: Orbit },
-  { to: "/tarot", label: "即时镜像", icon: Sparkles },
-  { to: "/chat", label: "随心闲谈", icon: MessageCircleMore },
-  { to: "/history", label: "反宿命日志", icon: Archive },
-];
+import { ParticleBackground, PointerAura } from "@/components/visual";
 
 export function PageShell() {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   const reduceMotion = useReducedMotion();
+  const { isEnglish, toggleLocale } = useLocale();
+  const navItems = isEnglish
+    ? [
+        { to: "/ziwei", label: "Star Paths", icon: Orbit },
+        { to: "/tarot", label: "Present Mirror", icon: Sparkles },
+        { to: "/chat", label: "Open Dialogue", icon: MessageCircleMore },
+        { to: "/history", label: "Choice Journal", icon: Archive },
+      ]
+    : [
+        { to: "/ziwei", label: "星轨推演", icon: Orbit },
+        { to: "/tarot", label: "即时镜像", icon: Sparkles },
+        { to: "/chat", label: "随心闲谈", icon: MessageCircleMore },
+        { to: "/history", label: "反宿命日志", icon: Archive },
+      ];
 
   useEffect(() => {
     setMobileOpen(false);
@@ -43,6 +51,7 @@ export function PageShell() {
         跳至主要内容
       </a>
       <ParticleBackground density={0.55} speed={0.55} />
+      <PointerAura />
       <div className="ambient-orb ambient-orb-a" aria-hidden="true" />
       <div className="ambient-orb ambient-orb-b" aria-hidden="true" />
 
@@ -51,7 +60,7 @@ export function PageShell() {
           <Link
             to="/"
             className="group flex items-center gap-3 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-haze-cyan/40"
-            aria-label="返回 Fate Fork 首页"
+            aria-label={isEnglish ? "Return to Fate Fork home" : "返回 Fate Fork 首页"}
           >
             <span className="relative grid size-8 place-items-center rounded-full border border-white/10 bg-white/[.05]">
               <span className="size-2 rounded-full bg-gradient-to-br from-haze-cyan to-haze-purple shadow-[0_0_15px_rgba(155,198,201,.55)]" />
@@ -62,12 +71,12 @@ export function PageShell() {
                 FATE FORK
               </span>
               <span className="block text-[9px] tracking-[.28em] text-mist-500">
-                命运岔途
+                {isEnglish ? "CHOICE PATHS" : "命运岔途"}
               </span>
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-1 lg:flex" aria-label="主要导航">
+          <nav className="hidden items-center gap-1 lg:flex" aria-label={isEnglish ? "Primary navigation" : "主要导航"}>
             {navItems.map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
@@ -86,6 +95,28 @@ export function PageShell() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              onClick={toggleLocale}
+              aria-label={isEnglish ? "Current language: English. Switch to Chinese." : "当前语言：中文。切换至英文。"}
+              aria-pressed={isEnglish}
+              className="h-9 gap-0 rounded-full border border-white/[.12] bg-space-900/65 p-1 text-[10px] tracking-[.08em] shadow-none hover:bg-space-900"
+            >
+              <span
+                className={`rounded-full px-2.5 py-1 transition duration-300 ${
+                  !isEnglish ? "bg-mist-100 text-space-950" : "text-mist-500"
+                }`}
+              >
+                中文
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-1 transition duration-300 ${
+                  isEnglish ? "bg-mist-100 text-space-950" : "text-mist-500"
+                }`}
+              >
+                EN
+              </span>
+            </Button>
             {location.pathname !== "/" && (
               <Button
                 variant="ghost"
@@ -94,7 +125,7 @@ export function PageShell() {
                 className="hidden sm:inline-flex"
               >
                 <ChevronLeft className="size-3.5" />
-                返回
+                {isEnglish ? "Back" : "返回"}
               </Button>
             )}
             <Button
@@ -102,7 +133,7 @@ export function PageShell() {
               size="icon"
               className="lg:hidden"
               onClick={() => setMobileOpen((value) => !value)}
-              aria-label={mobileOpen ? "关闭导航" : "打开导航"}
+              aria-label={mobileOpen ? (isEnglish ? "Close navigation" : "关闭导航") : isEnglish ? "Open navigation" : "打开导航"}
               aria-expanded={mobileOpen}
             >
               {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
@@ -118,7 +149,7 @@ export function PageShell() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: reduceMotion ? 0 : 0.35, ease: "easeOut" }}
               className="mx-auto mt-2 grid max-w-[1400px] gap-1 rounded-2xl border border-white/[.08] bg-space-950/90 p-2 shadow-glass backdrop-blur-xl lg:hidden"
-              aria-label="移动端导航"
+              aria-label={isEnglish ? "Mobile navigation" : "移动端导航"}
             >
               {navItems.map(({ to, label, icon: Icon }) => (
                 <NavLink

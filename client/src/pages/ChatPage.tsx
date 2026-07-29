@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiError } from "@/lib/api";
+import { useLocale } from "@/lib/locale";
 import { localStore, newId } from "@/lib/storage";
 import type { ChatMessage } from "@/types";
 
@@ -33,16 +34,43 @@ const prompts = [
   "我想分清这是直觉还是焦虑……",
 ];
 
+const promptsEnglish = [
+  "I keep wavering between two choices…",
+  "I know what to do, but I still cannot act…",
+  "I am afraid I will regret choosing wrong…",
+  "I want to tell intuition from anxiety…",
+];
+
+function initialDialogueMessage(isEnglish: boolean): ChatMessage {
+  return {
+    id: "welcome",
+    role: "assistant",
+    content: isEnglish
+      ? "Begin with the small part that feels most stuck. I will not use a chart or cards, and I will not rush to summarize an answer. We can separate what happened, what matters to you, and what can still change."
+      : initialMessage.content,
+    createdAt: initialMessage.createdAt,
+  };
+}
+
 export function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>([initialMessage]);
+  const { isEnglish } = useLocale();
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [initialDialogueMessage(isEnglish)]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [recordId, setRecordId] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isSendingRef = useRef(false);
   const [safetyNote, setSafetyNote] = useState("");
-  const [usingMock, setUsingMock] = useState(false);
+
+  useEffect(() => {
+    setMessages((current) =>
+      current.length === 1 && current[0]?.id === "welcome"
+        ? [initialDialogueMessage(isEnglish)]
+        : current,
+    );
+  }, [isEnglish]);
 
   useEffect(() => {
     const container = scrollRef.current;
@@ -55,7 +83,7 @@ export function ChatPage() {
 
   async function send(event: React.FormEvent) {
     event.preventDefault();
-    if (!input.trim() || loading) return;
+    if (!input.trim() || loading || isSendingRef.current) return;
 
     const userMessage: ChatMessage = {
       id: newId("message"),
@@ -67,6 +95,7 @@ export function ChatPage() {
     setMessages((current) => [...current, userMessage]);
     setInput("");
     setLoading(true);
+    isSendingRef.current = true;
     setError("");
 
     try {
@@ -82,7 +111,6 @@ export function ChatPage() {
       const nextMessages = [...messages, userMessage, assistantMessage];
       setMessages(nextMessages);
       setSafetyNote(result.safetyNote || "");
-      setUsingMock(result.meta?.provider === "mock");
 
       const summary = userMessage.content.slice(0, 90);
       if (recordId) {
@@ -103,28 +131,34 @@ export function ChatPage() {
         });
       }
     } catch (caught) {
+      // Restore an unsent thought to the composer instead of leaving a
+      // duplicate-looking user bubble in the conversation history.
+      setMessages((current) => current.filter((message) => message.id !== userMessage.id));
+      setInput(userMessage.content);
       setError(caught instanceof ApiError ? caught.message : "对话暂时没有送达。");
     } finally {
       setLoading(false);
+      isSendingRef.current = false;
     }
   }
 
   function clearConversation() {
-    setMessages([initialMessage]);
+    setMessages([initialDialogueMessage(isEnglish)]);
     setRecordId("");
     setInput("");
     setError("");
     setSafetyNote("");
-    setUsingMock(false);
   }
 
   return (
     <section className="page-container">
       <PageIntro
         eyebrow="OPEN DIALOGUE · NO SYMBOLS"
-        title="随心闲谈"
-        description="这里不启用紫微、塔罗或任何命理符号。只有一场开放式思辨对话，陪你把混在一起的事实、情绪、需要与行动慢慢分开。"
-        step="没有标准流程，从一句话开始"
+        title={isEnglish ? "Open Dialogue" : "随心闲谈"}
+        description={isEnglish
+          ? "No Zi Wei, tarot, or divination symbols are used here. This is an open reflective dialogue to slowly separate facts, feelings, needs, and action."
+          : "这里不启用紫微、塔罗或任何命理符号。只有一场开放式思辨对话，陪你把混在一起的事实、情绪、需要与行动慢慢分开。"}
+        step={isEnglish ? "No fixed path. Begin with one sentence." : "没有标准流程，从一句话开始"}
       />
 
       <div className="grid min-h-[680px] gap-5 lg:grid-cols-[.72fr_1.28fr]">
@@ -137,10 +171,12 @@ export function ChatPage() {
                   A SOFT START
                 </p>
               </div>
-              <h2 className="mt-3 text-lg font-light text-mist-200">可以这样开口</h2>
+              <h2 className="mt-3 text-lg font-light text-mist-200">
+                {isEnglish ? "You could begin here" : "可以这样开口"}
+              </h2>
             </CardHeader>
             <CardContent className="space-y-2">
-              {prompts.map((prompt) => (
+              {(isEnglish ? promptsEnglish : prompts).map((prompt) => (
                 <button
                   type="button"
                   key={prompt}
@@ -158,18 +194,18 @@ export function ChatPage() {
               {[
                 {
                   icon: CircleDotDashed,
-                  title: "不追求立刻确定",
-                  body: "先允许矛盾同时存在。",
+                  title: isEnglish ? "No need for instant certainty" : "不追求立刻确定",
+                  body: isEnglish ? "Let conflicting feelings exist together first." : "先允许矛盾同时存在。",
                 },
                 {
                   icon: BrainCircuit,
-                  title: "区分事实与推测",
-                  body: "让可以验证的条件浮现。",
+                  title: isEnglish ? "Separate facts from assumptions" : "区分事实与推测",
+                  body: isEnglish ? "Make the conditions you can verify visible." : "让可以验证的条件浮现。",
                 },
                 {
                   icon: ShieldCheck,
-                  title: "不替代专业支持",
-                  body: "高风险议题请寻找现实中的专业帮助。",
+                  title: isEnglish ? "Not a substitute for professional support" : "不替代专业支持",
+                  body: isEnglish ? "For high-risk concerns, seek qualified support in real life." : "高风险议题请寻找现实中的专业帮助。",
                 },
               ].map(({ icon: Icon, title, body }) => (
                 <div key={title} className="flex gap-3">
@@ -186,31 +222,33 @@ export function ChatPage() {
           </Card>
         </aside>
 
-        <Card className="flex min-h-[680px] flex-col">
-          <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-white/[.055]">
+        <Card className="flex h-[calc(100dvh-7rem)] min-h-[36rem] max-h-[46rem] flex-col">
+          <CardHeader className="shrink-0 flex flex-row items-center justify-between gap-4 border-b border-white/[.055]">
             <div className="flex items-center gap-3">
               <span className="relative size-2 rounded-full bg-haze-cyan/70">
                 <span className="absolute inset-0 animate-ping rounded-full bg-haze-cyan/30 [animation-duration:3s]" />
               </span>
               <div>
-                <p className="text-xs text-mist-300">思辨对话</p>
+                <p className="text-xs text-mist-300">
+                  {isEnglish ? "Reflective dialogue" : "思辨对话"}
+                </p>
                 <p className="mt-0.5 text-[9px] tracking-[.13em] text-mist-600">
-                  SYMBOL-FREE MODE{usingMock ? " · LOCAL DEMO" : ""}
+                  {isEnglish ? "FREE DIALOGUE" : "随心闲谈"}
                 </p>
               </div>
             </div>
             <Button variant="ghost" size="sm" onClick={clearConversation}>
               <Eraser className="size-3.5" />
-              开启新对话
+              {isEnglish ? "Start a new dialogue" : "开启新对话"}
             </Button>
           </CardHeader>
 
-          <CardContent className="flex flex-1 flex-col p-4 md:p-6">
+          <CardContent className="flex min-h-0 flex-1 flex-col p-4 md:p-6">
             <div
               ref={scrollRef}
-              className="flex-1 space-y-5 overflow-y-auto pr-1"
+              className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1"
               aria-live="polite"
-              aria-label="对话内容"
+              aria-label={isEnglish ? "Conversation" : "对话内容"}
             >
               {messages.map((message, index) => (
                 <motion.div
@@ -243,7 +281,7 @@ export function ChatPage() {
                             : "text-mist-600"
                         }`}
                       >
-                        {new Date(message.createdAt).toLocaleTimeString("zh-CN", {
+                        {new Date(message.createdAt).toLocaleTimeString(isEnglish ? "en" : "zh-CN", {
                           hour: "2-digit",
                           minute: "2-digit",
                         })}
@@ -260,7 +298,7 @@ export function ChatPage() {
                   </span>
                   <div className="flex items-center gap-2 rounded-[1.25rem] rounded-tl-sm border border-white/[.07] bg-white/[.03] px-4 py-3.5 text-xs text-mist-500">
                     <LoaderCircle className="size-3.5 animate-spin" />
-                    正在听，也在分辨……
+                    {isEnglish ? "Listening, and making room to discern…" : "正在听，也在分辨……"}
                   </div>
                 </motion.div>
               )}
@@ -284,22 +322,24 @@ export function ChatPage() {
                     }
                   }}
                   maxLength={1600}
-                  aria-label="输入随心闲谈消息"
+                  aria-label={isEnglish ? "Write an open-dialogue message" : "输入随心闲谈消息"}
                   className="min-h-24 pr-16"
-                  placeholder="慢慢写。Enter 发送，Shift + Enter 换行。"
+                  placeholder={isEnglish
+                    ? "Take your time. Enter to send, Shift + Enter for a new line."
+                    : "慢慢写。Enter 发送，Shift + Enter 换行。"}
                 />
                 <Button
                   type="submit"
                   size="icon"
                   disabled={!input.trim() || loading}
                   className="absolute bottom-3 right-3 rounded-xl"
-                  aria-label="发送消息"
+                  aria-label={isEnglish ? "Send message" : "发送消息"}
                 >
                   <ArrowUp className="size-4" />
                 </Button>
               </div>
               <div className="mt-2 flex items-center justify-between text-[9px] tracking-[.08em] text-mist-600">
-                <span>不启用命理符号 · 不构建 Agent 循环</span>
+                <span>{isEnglish ? "NO DIVINATION SYMBOLS · THINK FREELY" : "不启用命理符号 · 自由梳理思绪"}</span>
                 <span>{input.length} / 1600</span>
               </div>
             </form>
@@ -308,7 +348,9 @@ export function ChatPage() {
       </div>
 
       <InlineNotice className="mt-5">
-        对话内容会随历史记录保存在当前浏览器，便于你日后回看；不会建立用户画像或向量知识库。你可以随时在「反宿命日志」中删除。
+        {isEnglish
+          ? "This dialogue stays on this device for later reflection. You can delete it anytime from the Choice Journal."
+          : "对话会保存在当前设备，方便你日后回看；你可以随时在「反宿命日志」中删除。"}
       </InlineNotice>
     </section>
   );

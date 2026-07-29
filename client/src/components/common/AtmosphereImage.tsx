@@ -1,23 +1,33 @@
 import { Image, LoaderCircle, Waves } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/lib/locale";
 
 export function AtmosphereImage({
   src,
   loading,
   onGenerate,
   description,
+  matchedHeight,
 }: {
   src?: string;
   loading?: boolean;
   onGenerate: () => void;
   description: string;
+  /** Explicitly mirrors the measured height of a paired content panel. */
+  matchedHeight?: number;
 }) {
+  const { isEnglish } = useLocale();
   return (
-    <div className="glass-panel relative aspect-[16/9] overflow-hidden rounded-[1.75rem] border border-white/[.08] bg-gradient-to-br from-haze-purple/[.08] via-space-900/60 to-haze-cyan/[.07]">
+    <div
+      style={matchedHeight ? { height: matchedHeight } : undefined}
+      className={`glass-panel relative min-w-0 overflow-hidden rounded-[1.75rem] border border-white/[.08] bg-gradient-to-br from-haze-purple/[.08] via-space-900/60 to-haze-cyan/[.07] ${
+        matchedHeight ? "aspect-auto" : "aspect-[16/9]"
+      }`}
+    >
       {src ? (
         <img
           src={src}
-          alt="由叙事意象生成的抽象氛围图"
+          alt={isEnglish ? "Abstract atmosphere generated from narrative imagery" : "由叙事意象生成的抽象氛围图"}
           className="h-full w-full object-cover opacity-80"
         />
       ) : (
@@ -36,7 +46,7 @@ export function AtmosphereImage({
       )}
       <div className="absolute inset-x-0 bottom-0 flex items-end justify-between bg-gradient-to-t from-space-950/90 to-transparent p-5 pt-16">
         <p className="text-[9px] tracking-[.18em] text-mist-500">
-          ABSTRACT ATMOSPHERE · 无符号意象
+          {isEnglish ? "ABSTRACT ATMOSPHERE · SYMBOL-FREE" : "ABSTRACT ATMOSPHERE · 无符号意象"}
         </p>
         <Button size="sm" variant="soft" onClick={onGenerate} disabled={loading}>
           {loading ? (
@@ -44,7 +54,9 @@ export function AtmosphereImage({
           ) : (
             <Image className="size-3.5" />
           )}
-          {src ? "重新生成" : "生成意境图"}
+          {src
+            ? isEnglish ? "Regenerate" : "重新生成"
+            : isEnglish ? "Create atmosphere image" : "生成意境图"}
         </Button>
       </div>
     </div>

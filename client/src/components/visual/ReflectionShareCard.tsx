@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Download, LoaderCircle } from "lucide-react";
+import { useLocale } from "@/lib/locale";
 
 export interface ReflectionShareCardContent {
   title?: string;
@@ -12,6 +13,8 @@ export interface ReflectionShareCardContent {
   imageryTags?: string[];
   closingLine?: string;
   disclaimer?: string;
+  /** Controls only the share-card interface copy, not user-generated content. */
+  locale?: "zh-CN" | "en";
 }
 
 export interface ReflectionShareCardProps {
@@ -112,6 +115,12 @@ const seededPoint = (index: number, salt: number) => {
 export async function createReflectionCardPng(
   content: ReflectionShareCardContent,
 ): Promise<Blob> {
+  const isEnglish = content.locale === "en";
+  // Keep downloaded cards consistent with the in-page preview, including old
+  // records created before prompts were prevented from leaking here.
+  const closingLine = /[？?]\s*$/.test(content.closingLine?.trim() ?? "")
+    ? undefined
+    : content.closingLine;
   const canvas = document.createElement("canvas");
   canvas.width = CARD_WIDTH;
   canvas.height = CARD_HEIGHT;
@@ -223,7 +232,7 @@ export async function createReflectionCardPng(
     context.fillStyle = "rgba(203, 213, 225, 0.48)";
     context.font =
       '500 18px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-    context.fillText("此刻，我想记住", 126, cursorY);
+    context.fillText(isEnglish ? "WHAT I WANT TO REMEMBER" : "此刻，我想记住", 126, cursorY);
     cursorY += 48;
 
     const linesPerReflection = reflections.length >= 3 ? 1 : 2;
@@ -249,12 +258,12 @@ export async function createReflectionCardPng(
     });
   }
 
-  if (content.closingLine) {
+  if (closingLine) {
     const closingY = Math.min(1060, Math.max(cursorY + 36, 940));
     context.fillStyle = "rgba(197, 215, 219, 0.76)";
     context.font =
       '300 27px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-    drawMultilineText(context, content.closingLine, 126, closingY, 828, 43, 2);
+    drawMultilineText(context, closingLine, 126, closingY, 828, 43, 2);
   }
 
   context.fillStyle = "rgba(203, 213, 225, 0.28)";
@@ -263,14 +272,20 @@ export async function createReflectionCardPng(
   context.fillStyle = "rgba(226, 232, 240, 0.6)";
   context.font =
     '500 18px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
-  context.fillText("FATE FORK  ·  命运岔途", 126, 1204);
+  context.fillText(
+    isEnglish ? "FATE FORK  ·  CHOICE PATHS" : "FATE FORK  ·  命运岔途",
+    126,
+    1204,
+  );
 
   context.textAlign = "right";
   context.fillStyle = "rgba(203, 213, 225, 0.34)";
   context.font =
     '300 15px Inter, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif';
   context.fillText(
-    content.disclaimer ?? "叙事仅供自省参考，你始终是生活的作者",
+    content.disclaimer ?? (isEnglish
+      ? "This narrative is for reflection only. You remain the author of your life."
+      : "叙事仅供自省参考，你始终是生活的作者"),
     954,
     1207,
   );
@@ -304,16 +319,24 @@ export function ReflectionShareCard({
   onDownload,
   className = "",
 }: ReflectionShareCardProps) {
+  const { isEnglish } = useLocale();
   const [downloadState, setDownloadState] = useState<
     "idle" | "rendering" | "done" | "error"
   >("idle");
+  // Older locally saved cards may still contain a prompt in this field.
+  const closingLine = /[？?]\s*$/.test(content.closingLine?.trim() ?? "")
+    ? undefined
+    : content.closingLine;
 
   const handleDownload = async () => {
     if (downloadState === "rendering") return;
 
     setDownloadState("rendering");
     try {
-      const blob = await createReflectionCardPng(content);
+      const blob = await createReflectionCardPng({
+        ...content,
+        locale: isEnglish ? "en" : "zh-CN",
+      });
       const objectUrl = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = objectUrl;
@@ -348,7 +371,7 @@ export function ReflectionShareCard({
         </div>
 
         <h3 className="mt-7 text-2xl font-light tracking-[0.07em] text-slate-50 sm:text-3xl">
-          {content.title ?? "我的命运岔途复盘"}
+          {content.title ?? (isEnglish ? "My Fate Fork reflection" : "我的命运岔途复盘")}
         </h3>
         <div className="my-6 h-px bg-gradient-to-r from-slate-200/30 to-transparent" />
 
@@ -357,7 +380,7 @@ export function ReflectionShareCard({
         </blockquote>
 
         {content.imageryTags?.length ? (
-          <ul aria-label="意象标签" className="mt-5 flex flex-wrap gap-2">
+          <ul aria-label={isEnglish ? "Imagery tags" : "意象标签"} className="mt-5 flex flex-wrap gap-2">
             {Array.from(new Set(content.imageryTags))
               .slice(0, 5)
               .map((tag) => (
@@ -374,7 +397,7 @@ export function ReflectionShareCard({
         {content.reflections?.length ? (
           <div className="mt-7 border-t border-white/[0.07] pt-6">
             <p className="text-[0.67rem] font-medium uppercase tracking-[0.18em] text-slate-300/[0.45]">
-              此刻，我想记住
+              {isEnglish ? "WHAT I WANT TO REMEMBER" : "此刻，我想记住"}
             </p>
             <ul className="mt-4 space-y-3">
               {content.reflections.slice(0, 3).map((reflection, index) => (
@@ -393,18 +416,20 @@ export function ReflectionShareCard({
           </div>
         ) : null}
 
-        {content.closingLine ? (
+        {closingLine ? (
           <p className="mt-7 text-sm font-light leading-7 text-[#c5d7db]/70">
-            {content.closingLine}
+            {closingLine}
           </p>
         ) : null}
 
         <figcaption className="mt-8 flex flex-wrap items-end justify-between gap-4 border-t border-white/[0.07] pt-5">
           <span className="text-[0.65rem] font-medium tracking-[0.15em] text-slate-200/[0.55]">
-            FATE FORK · 命运岔途
+            {isEnglish ? "FATE FORK · CHOICE PATHS" : "FATE FORK · 命运岔途"}
           </span>
-          <span className="max-w-xs text-right text-[0.62rem] leading-5 text-slate-400/40">
-            {content.disclaimer ?? "叙事仅供自省参考，你始终是生活的作者"}
+          <span className="max-w-none whitespace-nowrap text-right text-[0.58rem] leading-5 tracking-[0.01em] text-slate-400/40 sm:text-[0.62rem] max-[540px]:whitespace-normal">
+            {content.disclaimer ?? (isEnglish
+              ? "This narrative is for reflection only. You remain the author of your life."
+              : "叙事仅供自省参考，你始终是生活的作者")}
           </span>
         </figcaption>
       </div>
@@ -419,9 +444,9 @@ export function ReflectionShareCard({
           }`}
         >
           {downloadState === "error"
-            ? "生成失败，请稍后重试"
+            ? isEnglish ? "Generation failed. Please try again." : "生成失败，请稍后重试"
             : downloadState === "done"
-              ? "图片已保存"
+              ? isEnglish ? "Image saved" : "图片已保存"
               : ""}
         </p>
         <button
@@ -437,7 +462,9 @@ export function ReflectionShareCard({
           ) : (
             <Download className="h-4 w-4" aria-hidden="true" />
           )}
-          {downloadState === "rendering" ? "正在生成…" : downloadLabel}
+          {downloadState === "rendering"
+            ? isEnglish ? "Creating…" : "正在生成…"
+            : isEnglish && downloadLabel === "下载复盘卡" ? "Download reflection card" : downloadLabel}
         </button>
       </div>
     </figure>

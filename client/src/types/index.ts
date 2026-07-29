@@ -78,6 +78,22 @@ export interface TarotSpread {
   cards: TarotCard[];
 }
 
+/** Concealed selection metadata; card identities remain server-side. */
+export interface TarotSelfDrawSession {
+  sessionId: string;
+  slotCount: number;
+  requiredSelections: number;
+  expiresAt: string;
+}
+
+export interface TarotSelfDrawPickResult {
+  sessionId: string;
+  selectedSlots: number[];
+  requiredSelections: number;
+  complete: boolean;
+  draw?: TarotSpread;
+}
+
 export interface TarotNarrative {
   title: string;
   grounding: string;
@@ -86,6 +102,7 @@ export interface TarotNarrative {
   possibilities: NarrativeSection[];
   gentleAction: string;
   followupPrompts: string[];
+  reflectionChoices?: string[][];
   emotionMeta: EmotionMeta;
   disclaimer: string;
   generatedBy?: string;
@@ -119,6 +136,8 @@ export interface ReflectionCardData {
   subtitle: string;
   insight: string;
   choices: string[];
+  /** A small, user-controlled action to carry out after the reflection. */
+  nextStep: string;
   closing: string;
   imageryTags: string[];
   createdAt: string;

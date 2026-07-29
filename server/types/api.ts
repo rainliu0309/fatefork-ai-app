@@ -219,6 +219,8 @@ export interface TarotNarrative {
   grounding: string;
   emotion: EmotionMetadata;
   reflectionQuestions: string[];
+  /** Four user-facing options for each reflection question, in the same order. */
+  reflectionChoices?: string[][];
   imageDirection: string;
   disclaimer: string;
   meta: GenerationMeta;

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowDown, ArrowUp, Layers3, RotateCcw } from "lucide-react";
+import { useLocale } from "@/lib/locale";
 
 export type TarotOrientation = "upright" | "reversed";
 
@@ -38,6 +39,7 @@ export function TarotFlipSpread({
   onReveal,
   className = "",
 }: TarotFlipSpreadProps) {
+  const { isEnglish } = useLocale();
   const displayedCards = useMemo(() => cards.slice(0, 3), [cards]);
   const signature = displayedCards
     .map((card, index) => cardKey(card, index))
@@ -94,19 +96,21 @@ export function TarotFlipSpread({
       <div
         className={`rounded-3xl border border-dashed border-white/10 bg-white/[0.025] px-5 py-14 text-center text-sm text-slate-400/70 ${className}`}
       >
-        抽牌完成后，三张镜像会在这里出现。
+        {isEnglish
+          ? "Your three mirrors will appear here once the draw is complete."
+          : "抽牌完成后，三张镜像会在这里出现。"}
       </div>
     );
   }
 
   return (
     <section
-      aria-label="三张塔罗镜像牌阵"
+      aria-label={isEnglish ? "Three-card tarot mirror spread" : "三张塔罗镜像牌阵"}
       className={className}
     >
       <div className="mb-4 flex items-center justify-between gap-3">
         <p className="text-xs leading-5 tracking-[0.12em] text-slate-300/[0.55]">
-          依次翻开，观察你的第一反应
+          {isEnglish ? "Turn them over in order and notice your first response" : "依次翻开，观察你的第一反应"}
         </p>
         <button
           type="button"
@@ -118,7 +122,9 @@ export function TarotFlipSpread({
           ) : (
             <Layers3 className="h-3.5 w-3.5" aria-hidden="true" />
           )}
-          {allRevealed ? "重新合上" : "全部翻开"}
+          {allRevealed
+            ? isEnglish ? "Close again" : "重新合上"
+            : isEnglish ? "Reveal all" : "全部翻开"}
         </button>
       </div>
 
@@ -133,7 +139,9 @@ export function TarotFlipSpread({
             <button
               key={key}
               type="button"
-              aria-label={`${card.position}：${revealed ? `${card.name}，${card.orientation === "upright" ? "正位" : "逆位"}` : "尚未翻开"}`}
+              aria-label={`${card.position}: ${revealed
+                ? `${card.name}, ${card.orientation === "upright" ? (isEnglish ? "upright" : "正位") : (isEnglish ? "reversed" : "逆位")}`
+                : isEnglish ? "not yet revealed" : "尚未翻开"}`}
               aria-pressed={revealed}
               onClick={() => revealCard(card, index)}
               className="group relative h-[24rem] w-full cursor-pointer rounded-[1.6rem] text-left [perspective:1200px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200/60 focus-visible:ring-offset-4 focus-visible:ring-offset-[#0b1220] sm:h-[26rem]"
@@ -165,7 +173,7 @@ export function TarotFlipSpread({
                   </span>
 
                   <span className="text-center text-xs tracking-[0.14em] text-slate-300/[0.55]">
-                    点击翻开
+                    {isEnglish ? "Click to reveal" : "点击翻开"}
                   </span>
                 </span>
 
@@ -178,7 +186,9 @@ export function TarotFlipSpread({
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-[0.65rem] tracking-wide text-slate-200/60">
                       <OrientationIcon className="h-3 w-3" aria-hidden="true" />
-                      {card.orientation === "upright" ? "正位" : "逆位"}
+                      {card.orientation === "upright"
+                        ? isEnglish ? "Upright" : "正位"
+                        : isEnglish ? "Reversed" : "逆位"}
                     </span>
                   </span>
 
@@ -208,7 +218,9 @@ export function TarotFlipSpread({
                   </span>
 
                   <span className="text-center text-[0.65rem] leading-5 tracking-wide text-slate-400/[0.45]">
-                    一种观察视角，而非结果判定
+                    {isEnglish
+                      ? "A perspective for observation, not a verdict"
+                      : "一种观察视角，而非结果判定"}
                   </span>
                 </span>
               </motion.span>
@@ -226,7 +238,9 @@ export function TarotFlipSpread({
             exit={{ opacity: 0 }}
             aria-live="polite"
           >
-            三张镜像已经展开。你可以先停留片刻，再阅读叙事。
+            {isEnglish
+              ? "All three mirrors are open. Pause for a moment before reading the narrative."
+              : "三张镜像已经展开。你可以先停留片刻，再阅读叙事。"}
           </motion.p>
         ) : null}
       </AnimatePresence>

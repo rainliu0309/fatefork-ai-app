@@ -7,7 +7,13 @@
  * exposing an Agnes key. It never performs RAG, tool calls, or agent loops.
  */
 import { mockAbstractImage, mockReflectionCard, mockReflectiveReply, mockTarotNarrative, mockZiweiNarrative } from "../server/ai/mock";
-import { drawThreeCardMirror, parseTarotDraw } from "../server/engine/tarot";
+import {
+  drawThreeCardMirror,
+  parseTarotDraw,
+  pickSelfDrawSlot,
+  prepareSelfDraw,
+  revealSelfDrawSlots,
+} from "../server/engine/tarot";
 import { calculateZiweiChart } from "../server/engine/ziwei";
 import type {
   EmotionMetadata,
@@ -166,6 +172,28 @@ async function handleApi(request: Request) {
     return json(drawThreeCardMirror(), 201);
   }
 
+  if (request.method === "POST" && url.pathname === "/api/tarot/prepare") {
+    return json(prepareSelfDraw(), 201);
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/tarot/pick") {
+    if (typeof body.sessionId !== "string" || typeof body.slot !== "number") {
+      throw new Error("请选择一张牌后再继续。");
+    }
+    return json(pickSelfDrawSlot(body.sessionId, body.slot));
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/tarot/reveal") {
+    if (
+      typeof body.sessionId !== "string" ||
+      !Array.isArray(body.slots) ||
+      body.slots.some((slot) => typeof slot !== "number")
+    ) {
+      throw new Error("请选择三张不同的牌后再翻开。");
+    }
+    return json(revealSelfDrawSlots(body.sessionId, body.slots));
+  }
+
   if (request.method === "POST" && url.pathname === "/api/tarot/narrative") {
     const draw = parseTarotDraw(body.draw ?? body.spread);
     return json(decorateTarot(mockTarotNarrative(draw)));
@@ -197,7 +225,7 @@ async function handleApi(request: Request) {
     return json({
       ...card,
       subtitle: card.eyebrow,
-      closing: card.quote,
+      closing: card.nextStep,
       createdAt: new Date().toISOString(),
     });
   }

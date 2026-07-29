@@ -62,7 +62,7 @@ export function parseJsonObject(raw: string): RecordValue {
     throw new AppError(
       502,
       "AGNES_INVALID_JSON",
-      "Agnes returned text that was not valid JSON.",
+      "这次叙事没有完整生成，请再试一次。",
     );
   }
 }
@@ -88,7 +88,13 @@ function optionalStringValue(
   path: string,
 ): string | undefined {
   if (record[key] === undefined) return undefined;
-  return stringValue(record, key, path);
+  const value = record[key];
+  if (typeof value !== "string") {
+    throw schemaError(`${path}.${key} must be a string when provided.`);
+  }
+  // Some providers serialize an omitted optional field as an empty string.
+  // Treat it as omitted; this preserves the schema's optional semantics.
+  return value.trim() || undefined;
 }
 
 function unitValue(record: RecordValue, key: string, path: string): number {
@@ -236,14 +242,13 @@ export function validateTarotNarrative(value: unknown): StructuredTarot {
 
 export function validateReflectiveReply(value: unknown): StructuredReply {
   const record = objectValue(value, "$");
+  const safetyNote = optionalStringValue(record, "safetyNote", "$");
   const result: StructuredReply = {
     reply: stringValue(record, "reply", "$"),
     observations: stringArray(record, "observations", "$", 1, 4),
     questions: stringArray(record, "questions", "$", 1, 3),
     emotion: emotionValue(objectValue(record.emotion, "$.emotion"), "$.emotion"),
-    ...(record.safetyNote !== undefined
-      ? { safetyNote: optionalStringValue(record, "safetyNote", "$") }
-      : {}),
+    ...(safetyNote ? { safetyNote } : {}),
   };
   return sanitizeEthicalLanguage(result);
 }
@@ -267,7 +272,7 @@ function schemaError(message: string): AppError {
   return new AppError(
     502,
     "AGNES_SCHEMA_MISMATCH",
-    "Agnes returned JSON that did not match the required schema.",
+    "这次叙事没有完整生成，请再试一次。",
     { reason: message },
   );
 }

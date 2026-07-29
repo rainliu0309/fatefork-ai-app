@@ -15,6 +15,7 @@ import { healthRouter } from "./routes/health.js";
 import { imageRouter } from "./routes/image.js";
 import { reflectionRouter } from "./routes/reflection.js";
 import { tarotRouter } from "./routes/tarot.js";
+import { translationRouter } from "./routes/translation.js";
 import { ziweiRouter } from "./routes/ziwei.js";
 
 export function createApp() {
@@ -35,6 +36,7 @@ export function createApp() {
   api.use("/chat", chatRouter);
   api.use("/image", imageRouter);
   api.use("/reflection", reflectionRouter);
+  api.use("/translation", translationRouter);
   api.use(notFound);
   app.use("/api", api);
 

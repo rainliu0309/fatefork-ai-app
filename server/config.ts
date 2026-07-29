@@ -36,6 +36,7 @@ export const config = {
     ),
     textModel: process.env.AGNES_TEXT_MODEL ?? "agnes-2.0-flash",
     imageModel: process.env.AGNES_IMAGE_MODEL ?? "agnes-image-2.1-flash",
+    textMaxTokens: integerEnv("AGNES_TEXT_MAX_TOKENS", 6_000, 1_024, 16_384),
     timeoutMs: integerEnv("AGNES_TIMEOUT_MS", 45_000, 1_000, 180_000),
     imageTimeoutMs: integerEnv("AGNES_IMAGE_TIMEOUT_MS", 90_000, 1_000, 300_000),
     maxRequestsPerMinute: integerEnv(

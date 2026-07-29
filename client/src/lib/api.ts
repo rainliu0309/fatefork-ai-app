@@ -2,11 +2,14 @@ import type {
   ChatMessage,
   ReflectionCardData,
   TarotNarrative,
+  TarotSelfDrawPickResult,
+  TarotSelfDrawSession,
   TarotSpread,
   ReflectiveReply,
   ZiweiChart,
   ZiweiNarrative,
 } from "@/types";
+import { getStoredLocale } from "@/lib/locale";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "/api").replace(/\/$/, "");
 
@@ -31,8 +34,20 @@ async function request<T>(
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
 
   try {
+    let body = options.body;
+    if (typeof body === "string") {
+      try {
+        const parsed: unknown = JSON.parse(body);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          body = JSON.stringify({ ...parsed, locale: getStoredLocale() });
+        }
+      } catch {
+        // Keep non-JSON request bodies untouched.
+      }
+    }
     const response = await fetch(`${API_BASE}${path}`, {
       ...options,
+      body,
       headers: {
         "Content-Type": "application/json",
         ...options.headers,
@@ -67,7 +82,7 @@ async function request<T>(
     if (error instanceof DOMException && error.name === "AbortError") {
       throw new ApiError("生成时间稍长，本次请求已暂停。你可以再次尝试。", 408, "TIMEOUT");
     }
-    throw new ApiError("未能连接到叙事服务，请确认本地后端已启动。", 503, "NETWORK_ERROR");
+    throw new ApiError("暂时无法连接到服务，请稍后重试。", 503, "NETWORK_ERROR");
   } finally {
     window.clearTimeout(timer);
   }
@@ -108,6 +123,24 @@ export const api = {
     request<TarotSpread>("/tarot/draw", {
       method: "POST",
       body: JSON.stringify({ question }),
+    }),
+
+  prepareTarotSelfDraw: () =>
+    request<TarotSelfDrawSession>("/tarot/prepare", {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  pickTarotSelfDraw: (sessionId: string, slot: number) =>
+    request<TarotSelfDrawPickResult>("/tarot/pick", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, slot }),
+    }),
+
+  revealTarotSelfDraw: (sessionId: string, slots: number[]) =>
+    request<TarotSelfDrawPickResult>("/tarot/reveal", {
+      method: "POST",
+      body: JSON.stringify({ sessionId, slots }),
     }),
 
   createTarotNarrative: (question: string, spread: TarotSpread) =>
@@ -207,4 +240,16 @@ export const api = {
       imageUrl: result.url,
       imageData: undefined,
     })),
+
+  translateGeneratedHistory: (
+    items: Array<{ id: string; title: string; summary: string }>,
+  ) =>
+    request<{ items: Array<{ id: string; title: string; summary: string }> }>(
+      "/translation/history",
+      {
+        method: "POST",
+        body: JSON.stringify({ items }),
+      },
+      60_000,
+    ),
 };

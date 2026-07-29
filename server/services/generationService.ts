@@ -1,4 +1,5 @@
 import { config, isAgnesConfigured } from "../config.js";
+import { AppError } from "../errors.js";
 import type {
   ClientEmotionMetadata,
   ConversationTurn,
@@ -24,6 +25,7 @@ import {
 } from "../ai/mock.js";
 import {
   ABSTRACT_IMAGE_SAFETY_PROMPT,
+  HISTORY_TRANSLATION_SYSTEM_PROMPT,
   REFLECTION_SYSTEM_PROMPT,
   REFLECTIVE_CHAT_SYSTEM_PROMPT,
   TAROT_SYSTEM_PROMPT,
@@ -41,6 +43,35 @@ import {
   validateTarotNarrative,
   validateZiweiNarrative,
 } from "../ai/json.js";
+
+export interface GeneratedHistoryExcerpt {
+  id: string;
+  title: string;
+  summary: string;
+}
+
+const HISTORY_TRANSLATION_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["items"],
+  properties: {
+    items: {
+      type: "array",
+      minItems: 1,
+      maxItems: 24,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title", "summary"],
+        properties: {
+          id: { type: "string", minLength: 1 },
+          title: { type: "string", minLength: 1 },
+          summary: { type: "string", minLength: 1 },
+        },
+      },
+    },
+  },
+} as const;
 
 const AGNES_META = {
   provider: "agnes" as const,
@@ -61,7 +92,10 @@ function clientEmotion(
   };
 }
 
-function decorateZiweiNarrative(narrative: ZiweiNarrative): ZiweiNarrative {
+function decorateZiweiNarrative(
+  narrative: ZiweiNarrative,
+  locale: SupportedLocale = "zh-CN",
+): ZiweiNarrative {
   return {
     ...narrative,
     opening: narrative.summary,
@@ -77,13 +111,81 @@ function decorateZiweiNarrative(narrative: ZiweiNarrative): ZiweiNarrative {
       phase: chapter.phase,
       reflection: chapter.choicePrompt,
     })),
-    sharedReflection:
-      `无论延续还是转向，两条路径都在邀请你辨认真实需要、可承担的代价与修订选择的时机。${narrative.reflectionQuestions[0]}`,
+    sharedReflection: locale === "en"
+      ? `Whether you continue or turn, both paths invite you to notice what you truly need, what costs you can hold, and when a choice may need revising. ${narrative.reflectionQuestions[0] ?? ""}`
+      : `无论延续还是转向，两条路径都在邀请你辨认真实需要、可承担的代价与修订选择的时机。${narrative.reflectionQuestions[0] ?? ""}`,
     emotionMeta: clientEmotion(narrative.emotion),
   };
 }
 
-function decorateTarotNarrative(narrative: TarotNarrative): TarotNarrative {
+function fallbackTarotReflectionChoices(
+  question: string,
+  index: number,
+  locale: SupportedLocale,
+): string[] {
+  if (locale === "en") {
+    return [
+      [
+        "Start with what matters to me most",
+        "Name the boundaries I can realistically hold",
+        "Gather one missing piece of information",
+        "Give myself a little time to observe",
+      ],
+      [
+        "Prioritize the need that feels most important now",
+        "Keep time and energy boundaries in view",
+        "Talk it through carefully with someone I trust",
+        "Do not rush to a conclusion yet",
+      ],
+      [
+        "Try one small, reversible action",
+        "Arrange a conversation that can bring feedback",
+        "Set a time to reflect again",
+        "Observe for now, without making a commitment",
+      ],
+    ][index] ?? [
+      "Pause for a moment",
+      "Check the practical conditions",
+      "Gather more information",
+      "Leave room to revise",
+    ];
+  }
+  const normalized = question.replace(/\s/g, "");
+  if (/(事实|推测|确认|信息)/.test(normalized)) {
+    return [
+      "先列出已经确认的三件事实",
+      "承认其中有一部分仍是我的推测",
+      "找一个人核实我最在意的信息",
+      "先不急着解释，继续观察几天",
+    ];
+  }
+  if (/(保护|放下|边界|需要|代价)/.test(normalized)) {
+    return [
+      "优先保护我此刻最在意的关系",
+      "优先保留自己的时间和精力边界",
+      "先不牺牲任何一边，补齐更多信息",
+      "允许暂时放下一个不再适合的期待",
+    ];
+  }
+  if (/(下一步|行动|尝试|一周|回头|反馈)/.test(normalized)) {
+    return [
+      "约一次能获得关键信息的对话",
+      "做一个不超过半小时的小尝试",
+      "给自己设一个一周后的复盘提醒",
+      "先把一项现实压力减到可承受范围",
+    ];
+  }
+  return [
+    ["先说清楚我真正关心的部分", "先确认我能承担的边界", "先补齐一项关键信息", "先给自己一点观察时间"],
+    ["优先照顾此刻最重要的需要", "先保留时间和精力边界", "先和可信的人认真谈谈", "暂时不急着定论"],
+    ["做一个小而可撤回的尝试", "先约一次能获得反馈的对话", "给自己设一个复盘节点", "暂时只观察，不作承诺"],
+  ][index] ?? ["先停留片刻", "先确认现实条件", "先补齐信息", "先留出修订空间"];
+}
+
+function decorateTarotNarrative(
+  narrative: TarotNarrative,
+  locale: SupportedLocale = "zh-CN",
+): TarotNarrative {
   const perspectives = narrative.possibilities.filter(
     (item): item is string => typeof item === "string",
   );
@@ -98,12 +200,17 @@ function decorateTarotNarrative(narrative: TarotNarrative): TarotNarrative {
     situation: layerSection(0),
     innerBlock: layerSection(1),
     possibilities: perspectives.map((perspective, index) => ({
-      title: `可能性视角 ${index + 1}`,
+      title: locale === "en" ? `Perspective ${index + 1}` : `可能性视角 ${index + 1}`,
       body: perspective,
       reflection: narrative.layers[2].gentlePrompt,
     })),
     gentleAction: narrative.grounding,
     followupPrompts: narrative.reflectionQuestions,
+    reflectionChoices:
+      narrative.reflectionChoices ??
+      narrative.reflectionQuestions.map((question, index) =>
+        fallbackTarotReflectionChoices(question, index, locale),
+      ),
     emotionMeta: clientEmotion(narrative.emotion),
   };
 }
@@ -115,11 +222,72 @@ function decorateReply(reply: ReflectiveReply): ReflectiveReply {
   };
 }
 
+/**
+ * Translates only generated record excerpts. It intentionally has no fallback:
+ * user-authored history is never sent or replaced when the model is unavailable.
+ */
+export async function translateGeneratedHistory(input: {
+  items: GeneratedHistoryExcerpt[];
+  locale: SupportedLocale;
+}): Promise<GeneratedHistoryExcerpt[]> {
+  if (!isAgnesConfigured) {
+    throw new AppError(
+      503,
+      "AGNES_NOT_CONFIGURED",
+      "Translation is unavailable until Agnes is configured.",
+    );
+  }
+
+  const result = await generateStructured<{ items: GeneratedHistoryExcerpt[] }>({
+    schemaName: "fatefork_generated_history_translation",
+    schema: HISTORY_TRANSLATION_SCHEMA,
+    systemPrompt: HISTORY_TRANSLATION_SYSTEM_PROMPT,
+    payload: { items: input.items },
+    locale: input.locale,
+    temperature: 0.2,
+    validate: (value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new AppError(502, "AGNES_SCHEMA_MISMATCH", "Translation response was incomplete.");
+      }
+      const items = (value as { items?: unknown }).items;
+      if (!Array.isArray(items) || items.length !== input.items.length) {
+        throw new AppError(502, "AGNES_SCHEMA_MISMATCH", "Translation response was incomplete.");
+      }
+      const expectedIds = new Set(input.items.map((item) => item.id));
+      const normalized = items.map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item)) {
+          throw new AppError(502, "AGNES_SCHEMA_MISMATCH", "Translation response was incomplete.");
+        }
+        const record = item as Record<string, unknown>;
+        if (
+          typeof record.id !== "string" ||
+          !expectedIds.has(record.id) ||
+          typeof record.title !== "string" ||
+          !record.title.trim() ||
+          typeof record.summary !== "string" ||
+          !record.summary.trim()
+        ) {
+          throw new AppError(502, "AGNES_SCHEMA_MISMATCH", "Translation response was incomplete.");
+        }
+        return {
+          id: record.id,
+          title: record.title.trim(),
+          summary: record.summary.trim(),
+        };
+      });
+      return { items: normalized };
+    },
+  });
+
+  return result.items;
+}
+
 function decorateReflection(card: ReflectionCard): ReflectionCard {
   return {
     ...card,
     subtitle: card.eyebrow,
-    closing: card.quote,
+    // The share-card footer is an action cue, never a question posed by the model.
+    closing: card.nextStep,
     createdAt: new Date().toISOString(),
   };
 }
@@ -160,7 +328,9 @@ export async function createZiweiNarrative(input: {
   moodImage?: string;
   locale: SupportedLocale;
 }): Promise<ZiweiNarrative> {
-  if (!isAgnesConfigured) return decorateZiweiNarrative(mockZiweiNarrative(input.chart));
+  if (!isAgnesConfigured) {
+    return decorateZiweiNarrative(mockZiweiNarrative(input.chart), input.locale);
+  }
 
   const result = await generateStructured({
     schemaName: "fatefork_ziwei_dual_narrative",
@@ -174,7 +344,7 @@ export async function createZiweiNarrative(input: {
     moodImage: input.moodImage,
     validate: validateZiweiNarrative,
   });
-  return decorateZiweiNarrative({ ...result, meta: AGNES_META });
+  return decorateZiweiNarrative({ ...result, meta: AGNES_META }, input.locale);
 }
 
 export async function createTarotNarrative(input: {
@@ -183,7 +353,9 @@ export async function createTarotNarrative(input: {
   moodImage?: string;
   locale: SupportedLocale;
 }): Promise<TarotNarrative> {
-  if (!isAgnesConfigured) return decorateTarotNarrative(mockTarotNarrative(input.draw));
+  if (!isAgnesConfigured) {
+    return decorateTarotNarrative(mockTarotNarrative(input.draw), input.locale);
+  }
 
   const result = await generateStructured({
     schemaName: "fatefork_tarot_mirror_narrative",
@@ -198,7 +370,7 @@ export async function createTarotNarrative(input: {
     moodImage: input.moodImage,
     validate: validateTarotNarrative,
   });
-  return decorateTarotNarrative({ ...result, meta: AGNES_META });
+  return decorateTarotNarrative({ ...result, meta: AGNES_META }, input.locale);
 }
 
 export async function createTarotFollowup(input: {

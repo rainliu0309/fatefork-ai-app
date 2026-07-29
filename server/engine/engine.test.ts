@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TAROT_DECK, drawThreeCardMirror } from "./tarot.js";
+import {
+  TAROT_DECK,
+  drawThreeCardMirror,
+  pickSelfDrawSlot,
+  prepareSelfDraw,
+  revealSelfDrawSlots,
+} from "./tarot.js";
 import { calculateZiweiChart } from "./ziwei.js";
 
 test("ziwei engine is deterministic and places all fourteen major stars", () => {
@@ -53,5 +59,41 @@ test("tarot engine owns a unique 78-card deck and draws three unique cards", () 
     draw.cards.every(
       (card) => card.orientation === "upright" || card.orientation === "reversed",
     ),
+  );
+});
+
+test("self-draw conceals the shuffled cards until three distinct locations are selected", () => {
+  const session = prepareSelfDraw();
+  assert.equal(session.slotCount, 78);
+  assert.equal(session.requiredSelections, 3);
+
+  const first = pickSelfDrawSlot(session.sessionId, 1);
+  assert.equal(first.complete, false);
+  assert.equal(first.draw, undefined);
+
+  const second = pickSelfDrawSlot(session.sessionId, 5);
+  assert.equal(second.complete, false);
+  assert.deepEqual(second.selectedSlots, [1, 5]);
+
+  const complete = pickSelfDrawSlot(session.sessionId, 9);
+  assert.equal(complete.complete, true);
+  assert.equal(complete.draw?.cards.length, 3);
+  assert.equal(new Set(complete.draw?.cards.map((card) => card.id)).size, 3);
+  assert.throws(
+    () => pickSelfDrawSlot(session.sessionId, 2),
+    /已失效/,
+  );
+});
+
+test("self-draw can reveal three user selections together", () => {
+  const session = prepareSelfDraw();
+  const result = revealSelfDrawSlots(session.sessionId, [2, 6, 10]);
+
+  assert.equal(result.complete, true);
+  assert.deepEqual(result.selectedSlots, [2, 6, 10]);
+  assert.equal(result.draw?.cards.length, 3);
+  assert.throws(
+    () => revealSelfDrawSlots(session.sessionId, [1, 1, 3]),
+    /已失效/,
   );
 });

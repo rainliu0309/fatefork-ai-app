@@ -161,6 +161,7 @@ npm run dev
 
 ```dotenv
 AGNES_API_KEY=your_server_side_key
+AGNES_TEXT_MAX_TOKENS=6000
 ```
 
 不要在变量名上添加 `VITE_`，否则密钥会进入浏览器构建产物。
@@ -180,6 +181,7 @@ AGNES_API_KEY=your_server_side_key
 | `AGNES_BASE_URL` | `https://apihub.agnes-ai.com/v1` | Agnes API 根地址 |
 | `AGNES_TEXT_MODEL` | `agnes-2.0-flash` | 叙事模型 |
 | `AGNES_IMAGE_MODEL` | `agnes-image-2.1-flash` | 抽象氛围图模型 |
+| `AGNES_TEXT_MAX_TOKENS` | `6000` | 单次叙事 JSON 的最大输出额度 |
 | `AGNES_TIMEOUT_MS` | `45000` | 文本请求超时 |
 | `AGNES_IMAGE_TIMEOUT_MS` | `90000` | 图片请求超时 |
 | `AGNES_MAX_REQUESTS_PER_MINUTE` | `30` | Agnes 网关分钟限流 |

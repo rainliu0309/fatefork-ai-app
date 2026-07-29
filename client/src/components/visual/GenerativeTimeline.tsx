@@ -34,9 +34,11 @@ export interface TimelineTrack {
 }
 
 export interface GenerativeTimelineProps {
-  /** Both entries receive identical layout weight and visual hierarchy. */
-  tracks: readonly [TimelineTrack, TimelineTrack];
+  /** One path can be revealed at a time, or several paths can be compared. */
+  tracks: readonly TimelineTrack[];
   metadata: TimelineEmotionMetadata;
+  /** Interface locale; narrative fields themselves are supplied by the API. */
+  locale?: "zh-CN" | "en";
   className?: string;
 }
 
@@ -44,6 +46,12 @@ const TEMPO_SECONDS: Record<TimelineTempo, number> = {
   slow: 14,
   steady: 10,
   flowing: 7,
+};
+
+const TEMPO_LABELS: Record<TimelineTempo, string> = {
+  slow: "缓慢",
+  steady: "平稳",
+  flowing: "流动",
 };
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value || 0));
@@ -62,6 +70,7 @@ interface TrackViewProps {
   metadata: TimelineEmotionMetadata;
   reduceMotion: boolean;
   headingId: string;
+  isEnglish: boolean;
 }
 
 function TrackView({
@@ -70,6 +79,7 @@ function TrackView({
   metadata,
   reduceMotion,
   headingId,
+  isEnglish,
 }: TrackViewProps) {
   const intensity = clamp01(metadata.conflictIntensity);
   const tagHash = hashTags(metadata.imageryTags);
@@ -211,7 +221,7 @@ function TrackView({
         </div>
       ) : (
         <div className="mt-6 rounded-2xl border border-dashed border-white/10 px-4 py-10 text-center text-sm text-slate-400/70">
-          这条路径仍在形成，稍后再看。
+          {isEnglish ? "This path is still taking shape. Return to it shortly." : "这条路径仍在形成，稍后再看。"}
         </div>
       )}
     </section>
@@ -219,14 +229,15 @@ function TrackView({
 }
 
 /**
- * Two equally weighted narrative tracks. Metadata affects movement only—not
- * color semantics—so neither path is framed as the “good” or “bad” option.
+ * Narrative tracks whose motion reflects atmosphere only—not path quality.
  */
 export function GenerativeTimeline({
   tracks,
   metadata,
+  locale = "zh-CN",
   className = "",
 }: GenerativeTimelineProps) {
+  const isEnglish = locale === "en";
   const shouldReduceMotion = useReducedMotion();
   const componentId = useId();
   const tags = Array.from(
@@ -238,11 +249,19 @@ export function GenerativeTimeline({
       <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-white/[0.07] bg-white/[0.025] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-xs tracking-[0.12em] text-slate-300/60">
           <Waves className="h-4 w-4" aria-hidden="true" />
-          <span>两条路径，同等展开</span>
+          <span>
+            {tracks.length === 1
+              ? isEnglish
+                ? "This path is unfolding gradually"
+                : "这条路径正在逐步展开"
+              : isEnglish
+                ? "Both paths are unfolding with equal weight"
+                : "两条路径，同等展开"}
+          </span>
         </div>
         {tags.length > 0 ? (
           <ul
-            aria-label="叙事意象"
+            aria-label={isEnglish ? "Narrative imagery" : "叙事意象"}
             className="flex flex-wrap gap-1.5"
           >
             {tags.map((tag) => (
@@ -258,11 +277,17 @@ export function GenerativeTimeline({
       </div>
 
       <p className="sr-only">
-        动态强度 {Math.round(clamp01(metadata.conflictIntensity) * 100)}%，
-        节奏为 {metadata.tempo}。动画仅表达叙事情绪，不代表路径优劣。
+        {isEnglish
+          ? `Dynamic intensity ${Math.round(clamp01(metadata.conflictIntensity) * 100)}%. Pace: ${metadata.tempo}. Animation expresses narrative atmosphere only, not path quality.`
+          : `动态强度 ${Math.round(clamp01(metadata.conflictIntensity) * 100)}%，节奏为 ${TEMPO_LABELS[metadata.tempo]}。动画仅表达叙事情绪，不代表路径优劣。`}
       </p>
 
-      <div className="grid items-start gap-4 md:grid-cols-2 lg:gap-6">
+      <div
+        className={joinClasses(
+          "grid items-start gap-4 lg:gap-6",
+          tracks.length > 1 && "md:grid-cols-2",
+        )}
+      >
         {tracks.map((track, index) => (
           <TrackView
             key={track.id ?? `${track.label}-${index}`}
@@ -271,6 +296,7 @@ export function GenerativeTimeline({
             metadata={metadata}
             reduceMotion={Boolean(shouldReduceMotion)}
             headingId={`${componentId}-track-${index}`}
+            isEnglish={isEnglish}
           />
         ))}
       </div>

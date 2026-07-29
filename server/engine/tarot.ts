@@ -1,9 +1,11 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { badRequest } from "../errors.js";
-import type { TarotCard, TarotDraw } from "../types/api.js";
+import type { TarotCard, TarotDraw, TarotOrientation } from "../types/api.js";
 import { asRecord } from "../utils/validation.js";
 
 const ENGINE_VERSION = "tarot-crypto-1.0.0";
+const SELF_DRAW_SLOT_COUNT = 78;
+const SELF_DRAW_TTL_MS = 20 * 60 * 1_000;
 
 const MAJOR_ARCANA: Array<
   Pick<TarotCard, "id" | "nameZh" | "nameEn" | "keywords">
@@ -101,6 +103,32 @@ if (TAROT_DECK.length !== 78) {
 
 const CARD_BY_ID = new Map(TAROT_DECK.map((card) => [card.id, card]));
 
+export interface TarotSelfDrawSession {
+  sessionId: string;
+  slotCount: number;
+  requiredSelections: number;
+  expiresAt: string;
+}
+
+export interface TarotSelfDrawPickResult {
+  sessionId: string;
+  selectedSlots: number[];
+  requiredSelections: number;
+  complete: boolean;
+  draw?: TarotDraw;
+}
+
+interface PendingSelfDraw {
+  slots: TarotCard[];
+  orientations: TarotOrientation[];
+  selectedSlots: number[];
+  expiresAt: number;
+}
+
+// Draw sessions carry only an already shuffled local deck and expire quickly.
+// No question, account, birth data, or other personal information is stored.
+const pendingSelfDraws = new Map<string, PendingSelfDraw>();
+
 /**
  * Fisher–Yates with `crypto.randomInt`. randomInt uses rejection sampling,
  * avoiding the modulo bias that a Math.random-based implementation can add.
@@ -114,33 +142,154 @@ function cryptographicShuffle<T>(source: readonly T[]): T[] {
   return shuffled;
 }
 
-export function drawThreeCardMirror(): TarotDraw {
-  const cards = cryptographicShuffle(TAROT_DECK).slice(0, 3).map((card, index) => ({
-    ...card,
-    name: card.nameZh,
-    ...(card.rank === undefined ? {} : { number: card.rank }),
-    orientation: randomInt(2) === 0 ? ("upright" as const) : ("reversed" as const),
-    position: POSITIONS[index].clientId,
-    positionLabel: POSITIONS[index].nameZh,
-    positionDetail: {
-      id: POSITIONS[index].id,
-      nameZh: POSITIONS[index].nameZh,
-      nameEn: POSITIONS[index].nameEn,
-      prompt: POSITIONS[index].prompt,
-    },
-  }));
-
+function createDraw(
+  cards: readonly TarotCard[],
+  orientations: readonly TarotOrientation[],
+): TarotDraw {
   const drawId = `td_${randomUUID()}`;
   return {
     drawId,
     spreadId: drawId,
     engineVersion: ENGINE_VERSION,
     spread: "three-mirror",
-    cards,
+    cards: cards.map((card, index) => ({
+      ...card,
+      name: card.nameZh,
+      ...(card.rank === undefined ? {} : { number: card.rank }),
+      orientation: orientations[index],
+      position: POSITIONS[index].clientId,
+      positionLabel: POSITIONS[index].nameZh,
+      positionDetail: {
+        id: POSITIONS[index].id,
+        nameZh: POSITIONS[index].nameZh,
+        nameEn: POSITIONS[index].nameEn,
+        prompt: POSITIONS[index].prompt,
+      },
+    })),
     drawnAt: new Date().toISOString(),
     randomSource: "node:crypto.randomInt + Fisher-Yates",
     algorithm: "crypto Fisher-Yates",
   };
+}
+
+function purgeExpiredSelfDraws(now = Date.now()) {
+  for (const [sessionId, session] of pendingSelfDraws) {
+    if (session.expiresAt <= now) pendingSelfDraws.delete(sessionId);
+  }
+}
+
+/**
+ * Prepares a concealed, server-shuffled set of card locations. The browser
+ * receives no card names or orientation until it has picked all three slots.
+ */
+export function prepareSelfDraw(): TarotSelfDrawSession {
+  purgeExpiredSelfDraws();
+  const sessionId = `ts_${randomUUID()}`;
+  const expiresAt = Date.now() + SELF_DRAW_TTL_MS;
+  const slots = cryptographicShuffle(TAROT_DECK).slice(0, SELF_DRAW_SLOT_COUNT);
+  pendingSelfDraws.set(sessionId, {
+    slots,
+    orientations: slots.map(() =>
+      randomInt(2) === 0 ? ("upright" as const) : ("reversed" as const),
+    ),
+    selectedSlots: [],
+    expiresAt,
+  });
+
+  return {
+    sessionId,
+    slotCount: SELF_DRAW_SLOT_COUNT,
+    requiredSelections: POSITIONS.length,
+    expiresAt: new Date(expiresAt).toISOString(),
+  };
+}
+
+/**
+ * Locks a user-selected concealed slot into the next spread position. A slot
+ * can never be selected twice, and the completed draw is assembled solely
+ * from the server-held shuffle.
+ */
+export function pickSelfDrawSlot(
+  sessionId: string,
+  slot: number,
+): TarotSelfDrawPickResult {
+  purgeExpiredSelfDraws();
+  const session = pendingSelfDraws.get(sessionId);
+  if (!session) {
+    throw badRequest("本次牌组已失效，请重新洗牌后再试。");
+  }
+  if (!Number.isInteger(slot) || slot < 0 || slot >= session.slots.length) {
+    throw badRequest("请选择牌组中的一张牌。");
+  }
+  if (session.selectedSlots.includes(slot)) {
+    throw badRequest("这张牌已经被选过了，请选择另一张。");
+  }
+
+  session.selectedSlots.push(slot);
+  const complete = session.selectedSlots.length === POSITIONS.length;
+  const selectedSlots = [...session.selectedSlots];
+  const response: TarotSelfDrawPickResult = {
+    sessionId,
+    selectedSlots,
+    requiredSelections: POSITIONS.length,
+    complete,
+  };
+
+  if (complete) {
+    response.draw = createDraw(
+      selectedSlots.map((selectedSlot) => session.slots[selectedSlot]),
+      selectedSlots.map((selectedSlot) => session.orientations[selectedSlot]),
+    );
+    pendingSelfDraws.delete(sessionId);
+  }
+
+  return response;
+}
+
+/**
+ * Resolves a complete user selection in one request. Validating all slots
+ * before mutating the session lets the UI offer an unhurried three-card choice
+ * and then reveal the completed spread together.
+ */
+export function revealSelfDrawSlots(
+  sessionId: string,
+  slots: number[],
+): TarotSelfDrawPickResult {
+  purgeExpiredSelfDraws();
+  const session = pendingSelfDraws.get(sessionId);
+  if (!session) {
+    throw badRequest("本次牌组已失效，请重新洗牌后再试。");
+  }
+  if (
+    slots.length !== POSITIONS.length ||
+    new Set(slots).size !== slots.length ||
+    slots.some(
+      (slot) => !Number.isInteger(slot) || slot < 0 || slot >= session.slots.length,
+    )
+  ) {
+    throw badRequest("请从牌组中选择三张不同的牌。");
+  }
+
+  const draw = createDraw(
+    slots.map((slot) => session.slots[slot]),
+    slots.map((slot) => session.orientations[slot]),
+  );
+  pendingSelfDraws.delete(sessionId);
+  return {
+    sessionId,
+    selectedSlots: [...slots],
+    requiredSelections: POSITIONS.length,
+    complete: true,
+    draw,
+  };
+}
+
+export function drawThreeCardMirror(): TarotDraw {
+  const cards = cryptographicShuffle(TAROT_DECK).slice(0, 3);
+  const orientations = cards.map(() =>
+    randomInt(2) === 0 ? ("upright" as const) : ("reversed" as const),
+  );
+  return createDraw(cards, orientations);
 }
 
 /**

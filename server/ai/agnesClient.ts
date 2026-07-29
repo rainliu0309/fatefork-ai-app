@@ -145,11 +145,33 @@ function canRetryWithoutResponseFormat(error: unknown): boolean {
   );
 }
 
+function canRetryInvalidStructuredOutput(error: unknown): boolean {
+  return (
+    error instanceof AppError &&
+    [
+      "AGNES_OUTPUT_TRUNCATED",
+      "AGNES_INVALID_JSON",
+      "AGNES_SCHEMA_MISMATCH",
+    ].includes(error.code)
+  );
+}
+
 function extractMessageContent(response: unknown): string {
   const record = response as {
-    choices?: Array<{ message?: { content?: unknown } }>;
+    choices?: Array<{
+      finish_reason?: unknown;
+      message?: { content?: unknown };
+    }>;
   };
-  const content = record.choices?.[0]?.message?.content;
+  const choice = record.choices?.[0];
+  if (choice?.finish_reason === "length") {
+    throw new AppError(
+      502,
+      "AGNES_OUTPUT_TRUNCATED",
+      "这次叙事没有完整生成，请再试一次。",
+    );
+  }
+  const content = choice?.message?.content;
   if (typeof content === "string" && content.trim()) return content;
   throw new AppError(
     502,
@@ -185,12 +207,14 @@ export async function generateStructured<T>(request: StructuredRequest<T>): Prom
       { role: "user", content },
     ],
     temperature: request.temperature ?? 0.55,
-    max_tokens: 4_096,
+    // The schema contains several nested, user-facing sections. Keep this
+    // configurable so a valid object is not cut off mid-field by the gateway.
+    max_tokens: config.agnes.textMaxTokens,
     stream: false,
     // Intentionally no tools/tool_choice/function definitions.
   };
-  const strictBody = {
-    ...baseBody,
+  const withResponseSchema = (body: Record<string, unknown>) => ({
+    ...body,
     response_format: {
       type: "json_schema",
       json_schema: {
@@ -199,26 +223,47 @@ export async function generateStructured<T>(request: StructuredRequest<T>): Prom
         schema: request.schema,
       },
     },
+  });
+
+  const requestCompletion = async (body: Record<string, unknown>): Promise<unknown> => {
+    try {
+      return await postJson(
+        "chat/completions",
+        withResponseSchema(body),
+        config.agnes.timeoutMs,
+      );
+    } catch (error) {
+      if (!canRetryWithoutResponseFormat(error)) throw error;
+      return postJson("chat/completions", body, config.agnes.timeoutMs);
+    }
   };
 
-  let providerResponse: unknown;
+  const validateCompletion = (response: unknown): T =>
+    request.validate(parseJsonObject(extractMessageContent(response)));
+
   try {
-    providerResponse = await postJson(
-      "chat/completions",
-      strictBody,
-      config.agnes.timeoutMs,
-    );
+    return validateCompletion(await requestCompletion(baseBody));
   } catch (error) {
-    if (!canRetryWithoutResponseFormat(error)) throw error;
-    providerResponse = await postJson(
-      "chat/completions",
-      baseBody,
-      config.agnes.timeoutMs,
-    );
+    if (!canRetryInvalidStructuredOutput(error)) throw error;
   }
 
-  const parsed = parseJsonObject(extractMessageContent(providerResponse));
-  return request.validate(parsed);
+  // One bounded formatting retry: no prior output is reused, no tools are
+  // called, and no local narrative is substituted. This is not an agent loop.
+  const recoveryBody: Record<string, unknown> = {
+    ...baseBody,
+    messages: [
+      {
+        role: "system",
+        content:
+          `${request.systemPrompt}\n\n` +
+          "【本次生成约束】请用简洁句子一次完成全部字段。只输出符合 Schema 的 JSON，不要解释、不要省略字段。",
+      },
+      { role: "user", content },
+    ],
+    temperature: Math.min(request.temperature ?? 0.55, 0.2),
+    max_tokens: Math.max(config.agnes.textMaxTokens, 8_000),
+  };
+  return validateCompletion(await requestCompletion(recoveryBody));
 }
 
 function extractGeneratedImage(response: unknown, prompt: string): GeneratedImage {
