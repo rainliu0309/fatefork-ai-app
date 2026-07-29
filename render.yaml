@@ -1,0 +1,34 @@
+# Render Blueprint: one Node web service builds the React client, then Express
+# serves both `/api/*` and `client/dist`.
+services:
+  - type: web
+    name: fatefork-ai-app
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AGNES_API_KEY
+        sync: false
+      - key: AGNES_BASE_URL
+        value: https://apihub.agnes-ai.com/v1
+      - key: AGNES_TEXT_MODEL
+        value: agnes-2.0-flash
+      - key: AGNES_IMAGE_MODEL
+        value: agnes-image-2.1-flash
+      - key: AGNES_TIMEOUT_MS
+        value: "45000"
+      - key: AGNES_IMAGE_TIMEOUT_MS
+        value: "90000"
+      - key: AGNES_MAX_REQUESTS_PER_MINUTE
+        value: "30"
+      - key: API_RATE_LIMIT_PER_MINUTE
+        value: "90"
+      - key: JSON_BODY_LIMIT
+        value: 12mb
+      - key: VITE_API_BASE_URL
+        value: /api
