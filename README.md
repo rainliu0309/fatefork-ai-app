@@ -5,7 +5,7 @@
 
 [中文](#中文) · [English](#english)
 
-**在线体验 / Live Demo:** [https://fatefork-ai-app.onrender.com](https://fatefork-ai-app.onrender.com)
+## 🚀 [Live Demo · 在线体验](https://fatefork-ai-app.onrender.com)
 
 Fate Fork 面向正在经历决策焦虑的年轻人，以受控多模态叙事陪伴你梳理选择与感受。
 它借用紫微斗数的长期视角与塔罗的短期镜像，也提供不启用任何命理符号的开放式对话。
@@ -439,3 +439,6 @@ user remains the author of every choice.
 
 Copyright © 2026 Rain Liu. All rights reserved. This project is proprietary;
 see [LICENSE](LICENSE) for usage restrictions.
+
+版权所有 © 2026 Rain Liu。保留所有权利。本项目为专有项目，使用限制请参阅
+[LICENSE](LICENSE)。
