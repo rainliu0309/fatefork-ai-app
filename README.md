@@ -3,10 +3,6 @@
 > **Explore two parallel paths of choice. You remain the author of your life.**  
 > 探索选择的两条平行路径，人生的作者始终是你。
 
-[中文](#中文) · [English](#english)
-
-## 🚀 [Live Demo · 在线体验](https://fatefork-ai-app.onrender.com)
-
 Fate Fork 面向正在经历决策焦虑的年轻人，以受控多模态叙事陪伴你梳理选择与感受。
 它借用紫微斗数的长期视角与塔罗的短期镜像，也提供不启用任何命理符号的开放式对话。
 产品不预测命运，也不替用户做决定；符号只负责打开视角，现实选择始终属于用户。
@@ -15,6 +11,10 @@ Fate Fork is a controlled multimodal narrative tool for young people navigating
 decision anxiety. It offers a long-horizon Zi Wei lens, a short-horizon tarot
 mirror, and an open conversation path with no divination symbols. It does not
 predict fate or make decisions for the user; symbols simply open a perspective.
+
+[中文](#中文) · [English](#english)
+
+### 🚀 [Live Demo · 在线体验](https://fatefork-ai-app.onrender.com)
 
 ---
 
