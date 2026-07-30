@@ -280,6 +280,11 @@ NODE_ENV=production npm start
 - 遇到危机内容时优先鼓励现实世界的即时人类支持；
 - 每次输出都保留「仅供自省叙事参考，决定权属于用户」的中立免责声明。
 
+### 版权声明
+
+版权所有 © 2026 Rain Liu。保留所有权利。本项目为专有项目，使用限制请参阅
+[LICENSE](LICENSE)。
+
 ---
 
 ## English
@@ -439,6 +444,3 @@ user remains the author of every choice.
 
 Copyright © 2026 Rain Liu. All rights reserved. This project is proprietary;
 see [LICENSE](LICENSE) for usage restrictions.
-
-版权所有 © 2026 Rain Liu。保留所有权利。本项目为专有项目，使用限制请参阅
-[LICENSE](LICENSE)。
